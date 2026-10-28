@@ -26,10 +26,12 @@ function getConfig() {
     instructions: $("instructions").value,
     quote: $("quote").value,
     footer: $("footer").value,
+    footerEnabled: $("footer-enabled").checked,
     nameLine: $("name-line").checked,
     dateLine: $("date-line").checked,
     pageSize: $("page-size").value,
     orientation: $("orientation").value,
+    margins: $("margins").value,
     font: $("font").value,
     wordColumns: Number($("word-columns").value),
     letterScale: Number($("letter-scale").value),
@@ -41,8 +43,9 @@ function getConfig() {
 const fieldMap = {
   words:"words", rows:"rows", cols:"cols", difficulty:"difficulty",
   title:"title", subtitle:"subtitle", instructions:"instructions",
-  quote:"quote", footer:"footer", nameLine:"name-line", dateLine:"date-line",
-  pageSize:"page-size", orientation:"orientation", font:"font",
+  quote:"quote", footer:"footer", footerEnabled:"footer-enabled",
+  nameLine:"name-line", dateLine:"date-line",
+  pageSize:"page-size", orientation:"orientation", margins:"margins", font:"font",
   wordColumns:"word-columns", letterScale:"letter-scale",
   checkboxes:"checkboxes", gridBorder:"grid-border"
 };
@@ -219,7 +222,10 @@ function buildWorksheetSVG(isAnswer) {
   if (!puzzle) throw Error("Generate a puzzle before downloading.");
   const config=getConfig();
   const page=getPage(config);
-  const W=page.w, H=page.h, margin=44;
+  const W=page.w, H=page.h;
+  // SVG uses 96 units/inch. Keep the existing 44-unit margin as Narrow.
+  const margin=({narrow:44,standard:64,wide:82})[config.margins] ?? 44;
+  const headerOffset=margin-44;
   const family=pageFont(config);
   const weight=pageWeight(config);
   const parts=[
@@ -231,22 +237,17 @@ function buildWorksheetSVG(isAnswer) {
   let titleSize=Math.max(20,Math.min(36,46-(config.title||"Word Search").length*0.37));
   const heading=(config.title||"Word Search")+(isAnswer?" — Answer Key":"");
   if (heading.length>35) titleSize=Math.min(titleSize,25);
-  parts.push(svgText(margin,55,heading,titleSize,'font-weight="'+weight+'"'));
-  if (!logoData) parts.push(svgText(W-margin,46,"WORD SEARCH",11,'font-weight="'+weight+'" text-anchor="end" letter-spacing="1"'));
-  if (logoData) parts.push('<image x="'+(W-138)+'" y="15" width="94" height="76" preserveAspectRatio="xMidYMid meet" filter="url(#logo-gray)" href="'+xml(logoData)+'"/>');
-  let lineY=75;
+  parts.push(svgText(margin,55+headerOffset,heading,titleSize,'font-weight="'+weight+'"'));
+  if (!logoData) parts.push(svgText(W-margin,46+headerOffset,"WORD SEARCH",11,'font-weight="'+weight+'" text-anchor="end" letter-spacing="1"'));
+  if (logoData) parts.push('<image x="'+(W-margin-94)+'" y="'+(margin-29)+'" width="94" height="76" preserveAspectRatio="xMidYMid meet" filter="url(#logo-gray)" href="'+xml(logoData)+'"/>');
+  let lineY=75+headerOffset;
   if (config.subtitle.trim()) {
-    parts.push(svgText(margin,78,config.subtitle.trim(),15,'font-style="italic"'));
-    lineY=92;
+    parts.push(svgText(margin,78+headerOffset,config.subtitle.trim(),15,'font-style="italic"'));
+    lineY=92+headerOffset;
   }
-  if (logoData) lineY=Math.max(lineY,104);
+  if (logoData) lineY=Math.max(lineY,margin+60);
   parts.push('<line x1="'+margin+'" y1="'+lineY+'" x2="'+(W-margin)+'" y2="'+lineY+'" stroke="#222" stroke-width="1.6"/>');
   let cursor=lineY+20;
-  if (config.nameLine || config.dateLine) {
-    if (config.nameLine) parts.push(svgText(margin,cursor,"Name __________________________",13));
-    if (config.dateLine) parts.push(svgText(W-margin,cursor,"Date ______________",13,'text-anchor="end"'));
-    cursor+=19;
-  }
   if (config.quote.trim()) {
     const lines=wrapText(config.quote.trim(),Math.max(34,Math.floor((W-2*margin)/7)),3);
     lines.forEach((l) => {parts.push(svgText(W/2,cursor,l,12,'font-style="italic" text-anchor="middle"'));cursor+=16;});
@@ -260,9 +261,16 @@ function buildWorksheetSVG(isAnswer) {
   const bankColumns=Math.min(Math.max(2,config.wordColumns||4),5);
   const bankRows=Math.ceil(puzzle.words.length/bankColumns);
   const bankLine=Math.max(18,Math.min(25,29-bankRows*.42));
-  const footerHeight=config.footer.trim()?45:23;
-  const reservedBank=bankRows*bankLine+24+footerHeight;
-  const availableHeight=H-cursor-reservedBank-16;
+  // Reserve independent bottom bands for the word bank, writing lines, and footer.
+  // This prevents long word lists from overlapping the Name/Date fields.
+  const footerVisible=config.footerEnabled && Boolean(config.footer.trim());
+  const footerBaseline=H-margin+17;
+  const showWritingLine=config.nameLine || config.dateLine;
+  const writingBaseline=showWritingLine?H-margin-(footerVisible?48:8):null;
+  const contentBottom=showWritingLine?writingBaseline-35:
+    footerVisible?footerBaseline-44:H-margin-15;
+  const bankY=contentBottom-10-(bankRows-1)*bankLine;
+  const availableHeight=bankY-36-cursor;
   const cell=Math.min((W-2*margin)/puzzle.cols,availableHeight/puzzle.rows,58);
   if (cell<14) throw Error("The page cannot fit this puzzle. Try fewer words, a larger paper orientation, or fewer grid rows.");
   const gridWidth=cell*puzzle.cols,gridHeight=cell*puzzle.rows;
@@ -287,7 +295,6 @@ function buildWorksheetSVG(isAnswer) {
         'font-weight="'+weight+'" text-anchor="middle" dominant-baseline="central"'));
     }
   }
-  const bankY=gridTop+gridHeight+35;
   const bankWidth=(W-2*margin)/bankColumns;
   puzzle.words.forEach((word,i) => {
     const c=Math.floor(i/bankRows),r=i%bankRows;
@@ -300,8 +307,31 @@ function buildWorksheetSVG(isAnswer) {
     const fontSize=Math.max(9,Math.min(14,(bankWidth-(config.checkboxes?20:2))/Math.max(1,word.label.length*.55)));
     parts.push(svgText(textX,y,word.label,fontSize));
   });
-  if (config.footer.trim()) {
-    parts.push(svgText(W/2,H-27,config.footer.trim(),11,'text-anchor="middle"'));
+  if (showWritingLine) {
+    // A geometric SVG stroke is continuous even in fonts with broken underscores.
+    // Labels use a predictable sans-serif font; the selected puzzle font is unchanged.
+    const labelAttrs='font-family="Arial, Helvetica, sans-serif" font-weight="400"';
+    const drawField=(label,x,endX) => {
+      parts.push(svgText(x,writingBaseline,label,13,labelAttrs));
+      parts.push('<line x1="'+(x+50)+'" y1="'+(writingBaseline+1)+
+        '" x2="'+endX+'" y2="'+(writingBaseline+1)+
+        '" stroke="#111" stroke-width="1.1"/>');
+    };
+    if (config.nameLine && config.dateLine) {
+      drawField("Name:",margin,W/2-20);
+      drawField("Date:",W/2+20,W-margin);
+    } else {
+      drawField(config.nameLine?"Name:":"Date:",margin,W-margin);
+    }
+  }
+  if (footerVisible) {
+    const footerLines=wrapText(config.footer.trim(),
+      Math.max(24,Math.floor((W-2*margin)/7)),2);
+    const startY=footerBaseline-(footerLines.length-1)*14;
+    footerLines.forEach((line,index) => {
+      parts.push(svgText(W/2,startY+index*14,line,11,
+        'text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="400"'));
+    });
   }
   parts.push("</g></svg>");
   return {svg:parts.join(""),width:W,height:H};
@@ -576,6 +606,14 @@ function validPuzzle(data,config) {
 function loadProject(data) {
   if (!data || data.version!==1 || !data.config || typeof data.config!=="object") {
     throw Error("This is not a supported Word Search Maker project file.");
+  }
+  // Legacy project files did not include footerEnabled or margins.
+  // Preserve their visible footer choices instead of forcing the new default.
+  if (!Object.prototype.hasOwnProperty.call(data.config,"footerEnabled")) {
+    $("footer-enabled").checked=Boolean(String(data.config.footer||"").trim());
+  }
+  if (!Object.prototype.hasOwnProperty.call(data.config,"margins")) {
+    $("margins").value="narrow";
   }
   applyConfig(data.config);
   const config=getConfig();
