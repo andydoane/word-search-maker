@@ -430,7 +430,10 @@ async function svgCanvas(isAnswer) {
       const weight=attr("font-weight",parentWeight);
       const size=num("font-size",14);
       const style=attr("font-style","normal");
-      ctx.font=style+" "+weight+" "+size+"px "+family;
+      // Per-element font overrides keep writing labels/footers consistent
+      // between the inline SVG preview, PNG export, and PDF export.
+      const textFamily=attr("font-family",family);
+      ctx.font=style+" "+weight+" "+size+"px "+textFamily;
       ctx.fillStyle=attr("fill","#111");
       ctx.textAlign=attr("text-anchor","start")==="end"?"right":
         attr("text-anchor","start")==="middle"?"center":"left";
