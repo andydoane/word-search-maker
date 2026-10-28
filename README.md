@@ -10,7 +10,10 @@ A free, printer-friendly word-search worksheet generator. Runs entirely in your 
 - Generate grids from 8×8 to 20×20, including rectangular layouts.
 - Easy mode places words forwards horizontally and vertically; Medium also allows forwards diagonals. Shared matching letters can overlap.
 - Shuffle to create a different arrangement.
-- Customize title, subtitle, name/date lines, instructions, quotation, footer, and optional image.
+- Customize title, subtitle, instructions, quotation, name/date writing lines, footer, and optional image.
+- Name and Date lines sit below the word bank and above the optional footer. Writing lines are drawn as continuous strokes rather than font underscores.
+- New worksheets show an editable footer by default: "See eatyourbible.com for more free Bible resources." Uncheck **Show footer** to hide it.
+- Choose **Narrow (current: 0.46 in)**, **Standard (0.67 in)**, or **Wide (0.85 in)** side margins.
 - Choose US Letter or A4, portrait or landscape, word-bank columns and checkboxes, letter sizing, and black-and-white font styles.
 - Download a 300-dpi PNG or PDF, optionally adding a line-marked answer key as page 2.
 - Download the answer key separately as a PNG.
@@ -26,6 +29,8 @@ A free, printer-friendly word-search worksheet generator. Runs entirely in your 
 6. Click **Download PDF** or **Download PNG**.
 
 Changing the words, difficulty, or grid size requires generating the puzzle again. If all words cannot fit, the page shows an error instead of silently omitting any.
+
+New footer and margin settings are saved in local and downloaded projects. Older projects without these settings reopen with Narrow margins and preserve whether they previously displayed footer text.
 
 ## Development and hosting
 
