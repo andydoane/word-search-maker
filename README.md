@@ -37,7 +37,9 @@ This is a static site with three files:
 
 No build tools are required. You can edit the files directly on GitHub. GitHub Pages is configured to deploy from `main` and the repository root; pushing to `main` updates the website.
 
-For local development, use a local HTTP server or open `index.html` in a browser. The PDF export uses [jsPDF](https://github.com/parallax/jsPDF) loaded from a public CDN; the site needs an internet connection to load that library. PNG export is handled natively in the browser.
+For local development, use a local HTTP server or open `index.html` in a browser. Both PDF and PNG exports are handled natively in the browser, without external JavaScript libraries or a CDN. PDF pages embed high-resolution (300-dpi) raster images of the worksheet for consistent printing.
+
+The `fonts/` directory contains 18 locally hosted Google Font files. They appear in the **Font style** menu. The Nunito Sans variable font is configured to use weight 1000 (its heaviest supported weight). Exports draw text with the loaded local fonts so the downloadable files match the preview. Keep the `fonts/` folder alongside `index.html`, `app.js`, and `styles.css` when hosting the site.
 
 ## Design and limits
 
