@@ -31,13 +31,13 @@ Changing the words, difficulty, or grid size requires generating the puzzle agai
 
 This is a static site with three files:
 
-- \`index.html\` — editor controls and preview
-- \`styles.css\` — responsive layout
-- \`app.js\` — generation, worksheet rendering, export, and save/load
+- `index.html` — editor controls and preview
+- `styles.css` — responsive layout
+- `app.js` — generation, worksheet rendering, export, and save/load
 
-No build tools are required. You can edit the files directly on GitHub. GitHub Pages is configured to deploy from \`main\` and the repository root; pushing to \`main\` updates the website.
+No build tools are required. You can edit the files directly on GitHub. GitHub Pages is configured to deploy from `main` and the repository root; pushing to `main` updates the website.
 
-For local development, use a local HTTP server or open \`index.html\` in a browser. The PDF export uses [jsPDF](https://github.com/parallax/jsPDF) loaded from a public CDN; the site needs an internet connection to load that library. PNG export is handled natively in the browser.
+For local development, use a local HTTP server or open `index.html` in a browser. The PDF export uses [jsPDF](https://github.com/parallax/jsPDF) loaded from a public CDN; the site needs an internet connection to load that library. PNG export is handled natively in the browser.
 
 ## Design and limits
 
