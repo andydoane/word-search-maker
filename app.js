@@ -527,8 +527,9 @@ async function downloadPDF() {
   try {
     const config=getConfig();
     const page=getPage(config);
-    const widthPoints=+(page.w*.75).toFixed(4);
-    const heightPoints=+(page.h*.75).toFixed(4);
+    const portraitPoints=config.pageSize==="a4"?[595.276,841.89]:[612,792];
+    const [widthPoints,heightPoints]=config.orientation==="landscape"?
+      [portraitPoints[1],portraitPoints[0]]:portraitPoints;
     const pages=[];
     const worksheet=await svgCanvas(false);
     pages.push({width:worksheet.width,height:worksheet.height,
