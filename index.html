@@ -62,8 +62,9 @@
           <textarea id="instructions" rows="2" placeholder="Find and circle the hidden words."></textarea>
           <label for="quote">Quotation / scripture <span class="hint">(optional)</span></label>
           <textarea id="quote" rows="2" placeholder="Add a quotation or verse"></textarea>
-          <label for="footer">Footer text <span class="hint">(optional)</span></label>
-          <input id="footer" type="text" maxlength="180" placeholder="Created with Word Search Maker">
+          <label class="footer-toggle"><input id="footer-enabled" type="checkbox" checked> Show footer</label>
+          <label for="footer">Footer text <span class="hint">(editable)</span></label>
+          <input id="footer" type="text" maxlength="180" value="See eatyourbible.com for more free Bible resources.">
           <div class="check-row">
             <label><input id="name-line" type="checkbox" checked> Name line</label>
             <label><input id="date-line" type="checkbox"> Date line</label>
@@ -87,6 +88,14 @@
               <select id="orientation">
                 <option value="portrait">Portrait</option>
                 <option value="landscape">Landscape</option>
+              </select>
+            </div>
+            <div>
+              <label for="margins">Page margins</label>
+              <select id="margins">
+                <option value="narrow" selected>Narrow (current — 0.46 in)</option>
+                <option value="standard">Standard (0.67 in)</option>
+                <option value="wide">Wide (0.85 in)</option>
               </select>
             </div>
             <div>
