@@ -185,10 +185,34 @@ function getPage(config) {
   return {w:w,h:h};
 }
 
+const FONT_FAMILIES = {
+  "alegreya-extra-bold":"Alegreya ExtraBold",
+  "anek-devanagari-extra-bold":"Anek Devanagari ExtraBold",
+  "baloo-2-extra-bold":"Baloo 2 ExtraBold",
+  "cabin-sketch-bold":"Cabin Sketch Bold",
+  "cherry-bomb-one":"Cherry Bomb One",
+  "dela-gothic-one":"Dela Gothic One",
+  "domine-bold":"Domine Bold",
+  "itim":"Itim",
+  "mouse-memoirs":"Mouse Memoirs",
+  "nunito-sans":"Nunito Sans",
+  "peralta":"Peralta",
+  "press-start-2p":"Press Start 2P",
+  "ribeye-marrow":"Ribeye Marrow",
+  "shantell-sans-bold":"Shantell Sans Bold",
+  "special-elite":"Special Elite",
+  "spicy-rice":"Spicy Rice",
+  "teko-semi-bold":"Teko SemiBold",
+  "zilla-slab-bold":"Zilla Slab Bold"
+};
 function pageFont(config) {
+  if (FONT_FAMILIES[config.font]) return '"' + FONT_FAMILIES[config.font] + '", sans-serif';
   if (config.font==="classic") return 'Georgia, "Times New Roman", serif';
   if (config.font==="clean") return 'Arial, Helvetica, sans-serif';
   return '"Comic Sans MS", "Trebuchet MS", cursive';
+}
+function pageWeight(config) {
+  return config.font==="nunito-sans"?1000:700;
 }
 
 function buildWorksheetSVG(isAnswer) {
@@ -197,17 +221,18 @@ function buildWorksheetSVG(isAnswer) {
   const page=getPage(config);
   const W=page.w, H=page.h, margin=44;
   const family=pageFont(config);
+  const weight=pageWeight(config);
   const parts=[
     '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+(isAnswer?"Answer key":"Word search worksheet")+'">',
     '<defs><filter id="logo-gray"><feColorMatrix type="saturate" values="0"/></filter></defs>',
     '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="white"/>',
-    '<g font-family="'+xml(family)+'">'
+    '<g font-family="'+xml(family)+'" font-weight="'+(config.font==="nunito-sans"?1000:400)+'">'
   ];
   let titleSize=Math.max(20,Math.min(36,46-(config.title||"Word Search").length*0.37));
   const heading=(config.title||"Word Search")+(isAnswer?" — Answer Key":"");
   if (heading.length>35) titleSize=Math.min(titleSize,25);
-  parts.push(svgText(margin,55,heading,titleSize,'font-weight="700"'));
-  if (!logoData) parts.push(svgText(W-margin,46,"WORD SEARCH",11,'font-weight="700" text-anchor="end" letter-spacing="1"'));
+  parts.push(svgText(margin,55,heading,titleSize,'font-weight="'+weight+'"'));
+  if (!logoData) parts.push(svgText(W-margin,46,"WORD SEARCH",11,'font-weight="'+weight+'" text-anchor="end" letter-spacing="1"'));
   if (logoData) parts.push('<image x="'+(W-138)+'" y="15" width="94" height="76" preserveAspectRatio="xMidYMid meet" filter="url(#logo-gray)" href="'+xml(logoData)+'"/>');
   let lineY=75;
   if (config.subtitle.trim()) {
@@ -259,7 +284,7 @@ function buildWorksheetSVG(isAnswer) {
     for (let c=0;c<puzzle.cols;c++) {
       const x=gridLeft+(c+.5)*cell, y=gridTop+(r+.5)*cell;
       parts.push(svgText(x,y,puzzle.board[r][c],letterSize,
-        'font-weight="700" text-anchor="middle" dominant-baseline="central"'));
+        'font-weight="'+weight+'" text-anchor="middle" dominant-baseline="central"'));
     }
   }
   const bankY=gridTop+gridHeight+35;
@@ -334,25 +359,93 @@ function downloadBlob(blob,filename) {
   setTimeout(() => URL.revokeObjectURL(url),1500);
 }
 
+// Render SVG primitives directly to Canvas so locally hosted fonts are reliably
+// included in PNG and PDF exports. SVG-as-an-image drops custom web fonts in
+// some browsers, even when the inline SVG preview looks correct.
 async function svgCanvas(isAnswer) {
   const data=buildWorksheetSVG(isAnswer);
-  const blob=new Blob([data.svg],{type:"image/svg+xml;charset=utf-8"});
-  const url=URL.createObjectURL(blob);
-  try {
-    const img=new Image();
-    await new Promise((resolve,reject) => {
-      img.onload=resolve;img.onerror=() => reject(Error("Could not render the worksheet image."));
-      img.src=url;
-    });
-    const scale=300/96;
-    const canvas=document.createElement("canvas");
-    canvas.width=Math.round(data.width*scale);
-    canvas.height=Math.round(data.height*scale);
-    const ctx=canvas.getContext("2d");
-    ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.drawImage(img,0,0,canvas.width,canvas.height);
-    return canvas;
-  } finally {URL.revokeObjectURL(url);}
+  const config=getConfig();
+  const selected=FONT_FAMILIES[config.font];
+  if (selected && document.fonts && document.fonts.load) {
+    // Wait for both regular word-bank text and the title/grid's heavier face.
+    await Promise.all([
+      document.fonts.load('400 18px "'+selected+'"'),
+      document.fonts.load(pageWeight(config)+' 18px "'+selected+'"')
+    ]);
+  }
+  const scale=300/96;
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.round(data.width*scale);
+  canvas.height=Math.round(data.height*scale);
+  const ctx=canvas.getContext("2d");
+  if (!ctx) throw Error("This browser cannot create the worksheet image.");
+  ctx.scale(scale,scale);
+  ctx.fillStyle="white";
+  ctx.fillRect(0,0,data.width,data.height);
+
+  const documentSVG=new DOMParser().parseFromString(data.svg,"image/svg+xml");
+  if (documentSVG.querySelector("parsererror")) throw Error("Invalid worksheet drawing.");
+  const group=documentSVG.querySelector("svg > g");
+  if (!group) throw Error("The worksheet has no drawing elements.");
+  const family=group.getAttribute("font-family") || "sans-serif";
+  const parentWeight=group.getAttribute("font-weight") || "400";
+
+  // Draw order follows SVG document order: grid highlights before letters.
+  for (const item of group.children) {
+    const tag=item.localName;
+    const attr=(name,defaultValue) => item.getAttribute(name) ?? defaultValue;
+    const num=(name,defaultValue=0) => Number(attr(name,String(defaultValue)));
+    ctx.save();
+    if (tag==="text") {
+      const weight=attr("font-weight",parentWeight);
+      const size=num("font-size",14);
+      const style=attr("font-style","normal");
+      ctx.font=style+" "+weight+" "+size+"px "+family;
+      ctx.fillStyle=attr("fill","#111");
+      ctx.textAlign=attr("text-anchor","start")==="end"?"right":
+        attr("text-anchor","start")==="middle"?"center":"left";
+      ctx.textBaseline=attr("dominant-baseline","auto")==="central"?"middle":"alphabetic";
+      ctx.fillText(item.textContent||"",num("x"),num("y"));
+    } else if (tag==="line") {
+      ctx.globalAlpha=num("opacity",1);
+      ctx.strokeStyle=attr("stroke","#111");
+      ctx.lineWidth=num("stroke-width",1);
+      ctx.lineCap=attr("stroke-linecap","butt");
+      ctx.beginPath();
+      ctx.moveTo(num("x1"),num("y1"));
+      ctx.lineTo(num("x2"),num("y2"));
+      ctx.stroke();
+    } else if (tag==="rect") {
+      const fill=attr("fill","none");
+      if (fill!=="none") {
+        ctx.fillStyle=fill;ctx.fillRect(num("x"),num("y"),num("width"),num("height"));
+      }
+      const stroke=attr("stroke","none");
+      if (stroke!=="none") {
+        ctx.strokeStyle=stroke;
+        ctx.lineWidth=num("stroke-width",1);
+        ctx.strokeRect(num("x"),num("y"),num("width"),num("height"));
+      }
+    } else if (tag==="image") {
+      const href=item.getAttribute("href") || item.getAttribute("xlink:href");
+      if (href) {
+        const image=new Image();
+        await new Promise((resolve,reject) => {
+          image.onload=resolve;
+          image.onerror=()=>reject(Error("Could not render uploaded picture."));
+          image.src=href;
+        });
+        const x=num("x"),y=num("y"),w=num("width"),h=num("height");
+        const ratio=Math.min(w/image.naturalWidth,h/image.naturalHeight);
+        const drawW=image.naturalWidth*ratio,drawH=image.naturalHeight*ratio;
+        ctx.filter="grayscale(1)";
+        ctx.drawImage(image,x+(w-drawW)/2,y+(h-drawH)/2,drawW,drawH);
+        ctx.filter="none";
+      }
+    }
+    ctx.restore();
+  }
+  return canvas;
 }
 
 async function canvasBlob(canvas) {
@@ -370,31 +463,82 @@ async function downloadPNG(isAnswer) {
   } catch (err) {setStatus(err.message,true);}
 }
 
+async function jpegBytes(canvas) {
+  const blob=await new Promise((resolve,reject) => canvas.toBlob(
+    (file) => file?resolve(file):reject(Error("Could not create PDF image.")),
+    "image/jpeg",0.94));
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+// A tiny, standards-compliant image-PDF writer. Each worksheet page is a
+// 300-dpi JPEG image on a correctly sized PDF page. There is no external
+// JavaScript PDF library, so CDN errors cannot break PDF downloads.
+function buildPDF(pages,widthPoints,heightPoints) {
+  const encoder=new TextEncoder();
+  const bytes=(value)=>encoder.encode(value);
+  const objects=Array(3*pages.length+3);
+  objects[1]=bytes("<< /Type /Catalog /Pages 2 0 R >>");
+  const refs=pages.map((_,index)=>(3+index*3)+" 0 R");
+  objects[2]=bytes("<< /Type /Pages /Kids ["+refs.join(" ")+"] /Count "+pages.length+" >>");
+  pages.forEach((page,index) => {
+    const id=3+index*3;
+    const dimensions=widthPoints+" "+heightPoints;
+    objects[id]=bytes("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 "+
+      dimensions+"] /Resources << /XObject << /Im0 "+(id+2)+
+      " 0 R >> >> /Contents "+(id+1)+" 0 R >>");
+    const instructions="q\n"+widthPoints+" 0 0 "+heightPoints+" 0 0 cm\n/Im0 Do\nQ\n";
+    const instructionBytes=bytes(instructions);
+    objects[id+1]=bytes("<< /Length "+instructionBytes.length+
+      " >>\nstream\n"+instructions+"endstream");
+    const header=bytes("<< /Type /XObject /Subtype /Image /Width "+page.width+
+      " /Height "+page.height+" /ColorSpace /DeviceRGB /BitsPerComponent 8 "+
+      "/Filter /DCTDecode /Length "+page.jpeg.length+" >>\nstream\n");
+    const tail=bytes("\nendstream");
+    const result=new Uint8Array(header.length+page.jpeg.length+tail.length);
+    result.set(header,0);
+    result.set(page.jpeg,header.length);
+    result.set(tail,header.length+page.jpeg.length);
+    objects[id+2]=result;
+  });
+  const parts=[];
+  let position=0;
+  const add=(piece) => {parts.push(piece);position+=piece.length;};
+  add(new Uint8Array([37,80,68,70,45,49,46,52,10,37,226,227,207,211,10]));
+  const offsets=[0];
+  for (let id=1;id<objects.length;id++) {
+    offsets[id]=position;
+    add(bytes(id+" 0 obj\n"));
+    add(objects[id]);
+    add(bytes("\nendobj\n"));
+  }
+  const xrefPosition=position;
+  add(bytes("xref\n0 "+objects.length+"\n0000000000 65535 f \n"));
+  for (let id=1;id<objects.length;id++) {
+    add(bytes(String(offsets[id]).padStart(10,"0")+" 00000 n \n"));
+  }
+  add(bytes("trailer\n<< /Size "+objects.length+
+    " /Root 1 0 R >>\nstartxref\n"+xrefPosition+"\n%%EOF\n"));
+  return new Blob(parts,{type:"application/pdf"});
+}
+
 async function downloadPDF() {
   if (!puzzle) return;
-  if (!window.jspdf || !window.jspdf.jsPDF) {
-    setStatus("PDF library failed to load. Check your connection, or use your browser's Print → Save as PDF.",true);
-    return;
-  }
   setStatus("Creating PDF…");
   try {
     const config=getConfig();
-    const letter=config.pageSize!=="a4";
-    let widthMM=letter?215.9:210;
-    let heightMM=letter?279.4:297;
-    if (config.orientation==="landscape") [widthMM,heightMM]=[heightMM,widthMM];
-    const doc=new window.jspdf.jsPDF({
-      orientation:config.orientation,unit:"mm",format:letter?"letter":"a4",
-      compress:true
-    });
-    const canvas=await svgCanvas(false);
-    doc.addImage(canvas.toDataURL("image/png"),"PNG",0,0,widthMM,heightMM);
+    const page=getPage(config);
+    const widthPoints=+(page.w*.75).toFixed(4);
+    const heightPoints=+(page.h*.75).toFixed(4);
+    const pages=[];
+    const worksheet=await svgCanvas(false);
+    pages.push({width:worksheet.width,height:worksheet.height,
+      jpeg:await jpegBytes(worksheet)});
     if ($("include-answer").checked) {
       const answer=await svgCanvas(true);
-      doc.addPage();
-      doc.addImage(answer.toDataURL("image/png"),"PNG",0,0,widthMM,heightMM);
+      pages.push({width:answer.width,height:answer.height,
+        jpeg:await jpegBytes(answer)});
     }
-    doc.save(safeFilename()+".pdf");
+    downloadBlob(buildPDF(pages,widthPoints,heightPoints),safeFilename()+".pdf");
     setStatus("PDF saved.");
   } catch (err) {setStatus(err.message,true);}
 }
