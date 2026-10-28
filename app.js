@@ -199,6 +199,7 @@ function buildWorksheetSVG(isAnswer) {
   const family=pageFont(config);
   const parts=[
     '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+(isAnswer?"Answer key":"Word search worksheet")+'">',
+    '<defs><filter id="logo-gray"><feColorMatrix type="saturate" values="0"/></filter></defs>',
     '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="white"/>',
     '<g font-family="'+xml(family)+'">'
   ];
@@ -207,7 +208,7 @@ function buildWorksheetSVG(isAnswer) {
   if (heading.length>35) titleSize=Math.min(titleSize,25);
   parts.push(svgText(margin,55,heading,titleSize,'font-weight="700"'));
   if (!logoData) parts.push(svgText(W-margin,46,"WORD SEARCH",11,'font-weight="700" text-anchor="end" letter-spacing="1"'));
-  if (logoData) parts.push('<image x="'+(W-138)+'" y="15" width="94" height="76" preserveAspectRatio="xMidYMid meet" href="'+xml(logoData)+'"/>');
+  if (logoData) parts.push('<image x="'+(W-138)+'" y="15" width="94" height="76" preserveAspectRatio="xMidYMid meet" filter="url(#logo-gray)" href="'+xml(logoData)+'"/>');
   let lineY=75;
   if (config.subtitle.trim()) {
     parts.push(svgText(margin,78,config.subtitle.trim(),15,'font-style="italic"'));
